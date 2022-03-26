@@ -3,26 +3,26 @@ mod events;
 
 use hidapi::HidDevice;
 
-use events::DialEvent;
+use events::{DialEvent, ConnectionEvent};
 
-pub struct SurfaceDial<'a> {
+pub struct SurfaceDial<'a> where  {
     device: Option<HidDevice>,
     subdivisions: u16,
     is_connected: bool,
-    on_connect: &'a dyn FnMut(),
-    on_disconnect: &'a dyn FnMut(),
+    on_connection_event: &'a dyn FnMut(ConnectionEvent),
     on_event: &'a dyn FnMut(DialEvent)
 }
 
-impl SurfaceDial<'_> {
-    pub fn new<'a>(on_connect: &'a dyn FnMut(), on_disconnect: &'a dyn FnMut(), on_event: &'a dyn FnMut(DialEvent)) -> SurfaceDial<'a> {
+impl<'a> SurfaceDial<'a> {
+    /// Creates a new `SurfaceDial` structure and begins the process of searching and
+    /// connecting to a dial.
+    pub fn new() -> SurfaceDial<'a> {
         SurfaceDial { 
             device: None,
             subdivisions: 0,
             is_connected: false,
-            on_connect,
-            on_disconnect,
-            on_event
+            on_connection_event: &|c| {},
+            on_event: &|e| {}
         }
     }
 
@@ -55,6 +55,14 @@ impl SurfaceDial<'_> {
 
             }
         }
+    }
+
+    pub fn set_connection_handler(&mut self, connection_handler: &'a dyn FnMut(ConnectionEvent)) {
+        self.on_connection_event = connection_handler;
+    }
+
+    pub fn set_event_handler(&mut self, event_handler: &'a dyn FnMut(DialEvent)) {
+        self.on_event = event_handler;
     }
 }
 
