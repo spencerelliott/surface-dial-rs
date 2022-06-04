@@ -38,6 +38,9 @@ impl<'a> SurfaceDial<'a> {
     /// # Examples
     /// 
     /// ```rust
+    /// use surface_dial_rs::SurfaceDial;
+    /// 
+    /// let mut dial = SurfaceDial::new();
     /// dial.set_subdivisions(20);
     /// ```
     pub fn set_subdivisions(&mut self, subdivisions: u16) {
