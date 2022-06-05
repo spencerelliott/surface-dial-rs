@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 hidapi = { version = "1.2.3", default-features = false, features = ["linux-shared-hidraw"] }
+flume = "0.10.12"

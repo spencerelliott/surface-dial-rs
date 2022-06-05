@@ -12,3 +12,13 @@ pub enum ConnectionEvent {
     Connect,
     Disconnect
 }
+
+pub enum TopLevelEvent {
+    DialEvent(DialEvent),
+    ConnectionEvent(ConnectionEvent)
+}
+
+pub enum ThreadSignals {
+    SendHaptics([u8; 8]),
+    End
+}
