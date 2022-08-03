@@ -16,7 +16,6 @@ const SURFACE_DIAL_DEVICE_ID: u16 = 0x091b;
 
 pub struct SurfaceDial<'a> where  {
     subdivisions: u16,
-    is_connected: bool,
     on_connection_event: &'a dyn Fn(ConnectionEvent),
     on_event: &'a dyn Fn(DialEvent),
     event_thread: Option<JoinHandle<()>>,
@@ -46,7 +45,7 @@ impl<'a> SurfaceDial<'a> {
                 button_state: false
             };
 
-            let mut current_haptic_bytes: [u8; 8] = [0x1, (0x0 & 0xff) as u8, ((0x0 >> 8) & 0xff) as u8, 0x0, 0x3, 0x0, 0x0, 0x0];
+            let mut current_haptic_bytes: [u8; 8] = [0x1, (0x24 & 0xff) as u8, ((0x0 >> 8) & 0xff) as u8, 0x0, 0x2, 0x0, 0x0, 0x0];
 
             while still_running {
                 // Check for thread messages
@@ -99,6 +98,7 @@ impl<'a> SurfaceDial<'a> {
                             },
                             Err(e) => {
                                 eprintln!("Error: {}", e);
+                                thread::sleep(time::Duration::from_millis(500));
                             }
                         }
                     },
@@ -155,7 +155,6 @@ impl<'a> SurfaceDial<'a> {
 
         SurfaceDial { 
             subdivisions: 0,
-            is_connected: false,
             on_connection_event: &|_c| {},
             on_event: &|_e| {},
             event_thread: Some(handler),
@@ -183,31 +182,49 @@ impl<'a> SurfaceDial<'a> {
     /// ```
     pub fn set_subdivisions(&mut self, subdivisions: u16) {
         self.subdivisions = subdivisions;
-        self.send_haptics();
+        self.send_haptics(true);
     }
 
-    fn send_haptics(&self) {
-        if self.is_connected {
-            let haptic_bytes: [u8; 8] = [0x1, (self.subdivisions & 0xff) as u8, ((self.subdivisions >> 8) & 0xff) as u8, 0x0, 0x3, 0x0, 0x0, 0x0];
-            self.signal_tx.send(ThreadSignals::SendHaptics(haptic_bytes)).expect("Could not send haptics message to thread");
-        }
+    /// Disables any subdivision settings and turns off the haptic feedback for the subdivisions
+    /// 
+    /// # Examples
+    /// 
+    /// ```rust
+    /// use surface_dial_rs::SurfaceDial;
+    /// 
+    /// let mut dial = SurfaceDial::new();
+    /// dial.disable_subdivisions();
+    /// ```
+    pub fn disable_subdivisions(&mut self) {
+        self.subdivisions = 36;
+        self.send_haptics(false);
+    }
+
+    fn send_haptics(&self, enable_haptics: bool) {
+        let haptic_bytes: [u8; 8] = [0x1, (self.subdivisions & 0xff) as u8, ((self.subdivisions >> 8) & 0xff) as u8, 0x0, if enable_haptics { 0x3 } else { 0x2 }, 0x0, 0x0, 0x0];
+        self.signal_tx.send(ThreadSignals::SendHaptics(haptic_bytes)).expect("Could not send haptics message to thread");
     }
 
     pub fn set_connection_handler(&mut self, connection_handler: &'a dyn Fn(ConnectionEvent)) {
         self.on_connection_event = connection_handler;
-
-        if (self.is_connected) {
-            (self.on_connection_event)(ConnectionEvent::Connect);
-        }
     }
 
     pub fn set_event_handler(&mut self, event_handler: &'a dyn Fn(DialEvent)) {
         self.on_event = event_handler;
     }
 
+    pub fn pop_event(&self) -> Option<TopLevelEvent> {
+        let result = self.event_rx.try_recv();
+
+        match result {
+            Ok(e) => Some(e),
+            Err(_e) => None
+        }
+    }
+
     /// Processes all of the events currently queued in the buffer. This should be called
     /// fairly often to make sure the buffer does not fill up.
-    pub fn process(&self) {
+    pub fn process_all(&self) {
         for e in self.event_rx.try_iter() {
             match e {
                 TopLevelEvent::ConnectionEvent(c) => (self.on_connection_event)(c),
